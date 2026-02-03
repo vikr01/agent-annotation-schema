@@ -4075,6 +4075,85 @@ The [walkthrough](./WALKTHROUGH.md) <sup>[[2]](#references)</sup> demonstrates t
   - When the schema manifest changes (tags added, removed, renamed), how are existing annotation files migrated?
 - **Performance characteristics**
   - For large codebases with thousands of annotation files, what indexing or caching strategies should the AQL implementation use?
+- **Extractor integration**
+  - How should extractor output merge with sidecar annotations when both exist for the same file?
+  - Should extractors run on every query, or cache results with file-watching invalidation?
+  - How should extractor errors surface (fail query, log warning, skip file)?
+
+## Extractor Runtime Integration
+
+Extractors bridge the gap between framework conventions and AQL annotations. This section describes how an AQL implementation should integrate extractor output.
+
+### Pipeline
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  .aql sidecars  │────▶│                 │────▶│                 │
+└─────────────────┘     │  Annotation     │     │    Unified      │
+                        │  Store          │     │    Query        │
+┌─────────────────┐     │                 │     │                 │
+│  Extractor JSON │────▶│                 │────▶│                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+1. **Sidecar Loading**: Parse `.aql` files into annotations (existing)
+2. **Extractor Execution**: Run configured extractors, collect JSON output
+3. **Merge**: Combine sidecar annotations with extractor annotations
+4. **Query**: Unified query across all annotation sources
+
+### Extractor Output Format
+
+Extractors emit JSON matching the annotation schema:
+
+```json
+{
+  "annotations": [
+    {
+      "file": "src/routes/users.ts",
+      "line": 42,
+      "bind": "createUser",
+      "tag": "endpoint",
+      "attrs": {
+        "method": "POST",
+        "path": "/api/users"
+      }
+    }
+  ]
+}
+```
+
+### Merge Semantics
+
+When both a sidecar and extractor provide annotations for the same binding:
+
+| Conflict | Resolution |
+|----------|------------|
+| Same tag, same attrs | Deduplicate (keep one) |
+| Same tag, different attrs | Sidecar wins (manual override) |
+| Different tags | Keep both (additive) |
+
+Rationale: Sidecars represent intentional human/agent authorship. Extractors discover what exists. Human intent overrides discovered defaults.
+
+### Caching Strategy
+
+Extractors can be expensive (spawning processes, parsing large codebases). Recommended caching:
+
+1. **Manifest-triggered**: Re-run extractors when `aql.schema` changes
+2. **Source-triggered**: Re-run when source files matching extractor globs change
+3. **On-demand**: Run once per session, refresh on explicit `aql refresh`
+
+Implementations may choose eagerness based on use case (IDE plugin vs CI).
+
+### Error Handling
+
+| Error | Behavior |
+|-------|----------|
+| Extractor not found | Log warning, continue without |
+| Extractor crashes | Log error with stderr, continue without |
+| Invalid JSON output | Log parse error, continue without |
+| Schema violation | Log validation error, skip invalid annotations |
+
+Extractors are optional enhancements. Failures should degrade gracefully, not break queries.
 
 ---
 
