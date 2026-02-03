@@ -2979,6 +2979,373 @@ tags:
     note: "All service-to-service calls go through Envoy proxy"
 ```
 
+### UI Framework Taxonomy
+
+Declarative UI frameworks (SwiftUI, React Native, Flutter, Jetpack Compose) share patterns but use different terminology:
+
+| Framework | View | State | Binding | Lifecycle | Navigation |
+|-----------|------|-------|---------|-----------|------------|
+| **SwiftUI** | `View` | `@State` | `@Binding` | `.onAppear` | `NavigationStack` |
+| **UIKit** | `UIView` | property | delegate | `viewDidLoad` | `UINavigationController` |
+| **React Native** | Component | `useState` | props | `useEffect` | React Navigation |
+| **Flutter** | `Widget` | `setState` | callback | `initState` | `Navigator` |
+| **Jetpack Compose** | `@Composable` | `remember` | state hoisting | `LaunchedEffect` | NavHost |
+
+#### Unified Vocabulary
+
+**View Type**:
+- `screen` — Full-screen view/page
+- `component` — Reusable UI component
+- `layout` — Container/layout component
+- `control` — Interactive control (button, input, etc.)
+- `decorator` — Modifier/wrapper (SwiftUI modifiers, HOCs)
+
+**State Scope**:
+- `local` — Component-local state (@State, useState)
+- `inherited` — Passed from parent (@Binding, props)
+- `shared` — Shared across components (@EnvironmentObject, Context)
+- `global` — App-wide state (Redux, @Observable)
+
+**Lifecycle Phase**:
+- `mount` — Component created/appeared
+- `update` — State/props changed
+- `unmount` — Component destroyed/disappeared
+
+**Platform**:
+- `ios` — iOS only
+- `android` — Android only
+- `web` — Web only
+- `cross-platform` — All platforms
+
+#### Example UI Tags
+
+```yaml
+tags:
+  ui-view:
+    description: A UI view/component
+    attrs:
+      type: { type: enum, values: [screen, component, layout, control, decorator] }
+      platform: { type: enum, values: [ios, android, web, cross-platform] }
+      pure: { type: boolean }                   # No side effects, deterministic
+      accessibility:
+        type: object
+        properties:
+          label: { type: string }
+          hint: { type: string }
+          role: { type: string }
+
+  ui-state:
+    description: State declaration in a UI component
+    attrs:
+      scope: { type: enum, values: [local, inherited, shared, global] }
+      source: { type: string }                  # Where state comes from
+      persisted: { type: boolean }              # Survives app restart?
+      observed: { type: boolean }               # Triggers re-render on change?
+
+  ui-lifecycle:
+    description: Lifecycle hook in a UI component
+    attrs:
+      phase: { type: enum, values: [mount, update, unmount] }
+      async: { type: boolean }
+      cleanup: { type: string }                 # Cleanup function/action
+      dependencies: { type: string[] }          # What triggers re-run
+
+  ui-navigation:
+    description: Navigation action or destination
+    attrs:
+      type: { type: enum, values: [push, present, replace, pop, deep-link] }
+      destination: { type: string }
+      params: { type: string[] }
+      animated: { type: boolean }
+```
+
+#### SwiftUI Examples
+
+```yaml
+# SwiftUI View
+- select: 'class[name="ProfileView"]'
+  tag: ui-view
+  attrs:
+    type: screen
+    platform: ios
+    pure: false
+
+# @State property
+- select: 'field[decorators~="State"]'
+  tag: ui-state
+  attrs:
+    scope: local
+    observed: true
+    note: "Triggers view re-render on change"
+
+# @Binding property
+- select: 'field[decorators~="Binding"]'
+  tag: ui-state
+  attrs:
+    scope: inherited
+    observed: true
+    note: "Two-way binding to parent state"
+
+# @EnvironmentObject
+- select: 'field[decorators~="EnvironmentObject"]'
+  tag: ui-state
+  attrs:
+    scope: shared
+    source: "SwiftUI environment"
+    observed: true
+
+# .onAppear modifier
+- select: 'call[name="onAppear"]'
+  tag: ui-lifecycle
+  attrs:
+    phase: mount
+    async: false
+
+# .task modifier (async)
+- select: 'call[name="task"]'
+  tag: ui-lifecycle
+  attrs:
+    phase: mount
+    async: true
+    cleanup: "Task cancelled on disappear"
+```
+
+#### React Native Examples
+
+```yaml
+# Screen component
+- select: 'function[name="ProfileScreen"]'
+  tag: ui-view
+  attrs:
+    type: screen
+    platform: cross-platform
+    pure: false
+
+# useState hook
+- select: 'call[name="useState"]'
+  tag: ui-state
+  attrs:
+    scope: local
+    observed: true
+
+# useContext hook
+- select: 'call[name="useContext"]'
+  tag: ui-state
+  attrs:
+    scope: shared
+    source: $1  # Context name from first argument
+
+# useEffect for mount
+- select: 'call[name="useEffect"]'
+  tag: ui-lifecycle
+  attrs:
+    phase: mount
+    dependencies: $2  # Dependency array
+    cleanup: "Return function called on unmount"
+
+# Navigation
+- select: 'call[name="navigation.navigate"]'
+  tag: ui-navigation
+  attrs:
+    type: push
+    destination: $1
+    params: $2
+```
+
+#### Flutter Examples
+
+```yaml
+# StatefulWidget
+- select: 'class[extends="StatefulWidget"]'
+  tag: ui-view
+  attrs:
+    type: component
+    platform: cross-platform
+    pure: false
+
+# StatelessWidget
+- select: 'class[extends="StatelessWidget"]'
+  tag: ui-view
+  attrs:
+    type: component
+    platform: cross-platform
+    pure: true
+
+# initState
+- select: 'method[name="initState"]'
+  tag: ui-lifecycle
+  attrs:
+    phase: mount
+
+# dispose
+- select: 'method[name="dispose"]'
+  tag: ui-lifecycle
+  attrs:
+    phase: unmount
+    note: "Clean up controllers, subscriptions"
+
+# Navigator.push
+- select: 'call[name="Navigator.push"]'
+  tag: ui-navigation
+  attrs:
+    type: push
+    animated: true
+```
+
+#### Jetpack Compose Examples
+
+```yaml
+# Composable function
+- select: 'function[decorators~="Composable"]'
+  tag: ui-view
+  attrs:
+    type: component
+    platform: android
+
+# remember { mutableStateOf() }
+- select: 'call[name="remember"]'
+  tag: ui-state
+  attrs:
+    scope: local
+    observed: true
+
+# LaunchedEffect
+- select: 'call[name="LaunchedEffect"]'
+  tag: ui-lifecycle
+  attrs:
+    phase: mount
+    async: true
+    dependencies: $1  # Key parameter
+
+# DisposableEffect
+- select: 'call[name="DisposableEffect"]'
+  tag: ui-lifecycle
+  attrs:
+    phase: mount
+    cleanup: "onDispose block"
+```
+
+#### Native Bridge Taxonomy
+
+Cross-platform frameworks need to call native code:
+
+| Framework | Bridge Mechanism | Example |
+|-----------|-----------------|---------|
+| React Native | Native Modules | `NativeModules.MyModule.doSomething()` |
+| Flutter | Platform Channels | `MethodChannel('channel').invokeMethod()` |
+| Kotlin Multiplatform | expect/actual | `expect fun platformName(): String` |
+| Capacitor | Plugins | `Plugins.Camera.getPhoto()` |
+
+```yaml
+tags:
+  native-bridge:
+    description: Call from cross-platform code to native platform code
+    attrs:
+      direction: { type: enum, values: [to-native, from-native] }
+      platform: { type: enum, values: [ios, android, web, all] }
+      async: { type: boolean }
+      channel: { type: string }                 # Channel/module name
+      method: { type: string }
+      fallback: { type: string }                # Fallback if not available
+      permissions: { type: string[] }           # Required permissions
+```
+
+```yaml
+# React Native native module call
+- select: 'call[name="NativeModules.Camera.takePicture"]'
+  tag: native-bridge
+  attrs:
+    direction: to-native
+    platform: all
+    async: true
+    channel: Camera
+    method: takePicture
+    permissions: ["camera"]
+
+# Flutter platform channel
+- select: 'call[name="invokeMethod"][lang-hint="platform-channel"]'
+  tag: native-bridge
+  attrs:
+    direction: to-native
+    async: true
+    channel: $receiver  # The MethodChannel instance
+    method: $1          # Method name argument
+```
+
+#### Accessibility Taxonomy
+
+Accessibility is critical for mobile apps:
+
+```yaml
+tags:
+  accessibility:
+    description: Accessibility configuration for a UI element
+    attrs:
+      label: { type: string }                   # Screen reader label
+      hint: { type: string }                    # Additional context
+      role: { type: enum, values: [button, link, header, image, text, list, checkbox, radio, slider, switch] }
+      hidden: { type: boolean }                 # Hidden from screen readers
+      live-region: { type: enum, values: [none, polite, assertive] }
+      actions: { type: string[] }               # Custom accessibility actions
+      order: { type: number }                   # Focus order
+```
+
+```yaml
+# SwiftUI accessibility
+- select: 'call[name="accessibilityLabel"]'
+  tag: accessibility
+  attrs:
+    label: $1
+
+# React Native accessible prop
+- select: 'field[name="accessible"]'
+  tag: accessibility
+  attrs:
+    role: $sibling.accessibilityRole
+    label: $sibling.accessibilityLabel
+```
+
+#### Animation Taxonomy
+
+Animations are a key part of mobile UX:
+
+```yaml
+tags:
+  animation:
+    description: Animation definition
+    attrs:
+      type: { type: enum, values: [transition, spring, keyframe, gesture-driven] }
+      duration: { type: duration }
+      easing: { type: enum, values: [linear, ease-in, ease-out, ease-in-out, spring] }
+      property: { type: string }                # What's being animated
+      interruptible: { type: boolean }
+      repeats: { type: boolean }
+```
+
+```yaml
+# SwiftUI withAnimation
+- select: 'call[name="withAnimation"]'
+  tag: animation
+  attrs:
+    type: transition
+    easing: $1.animation  # Animation curve from argument
+
+# React Native Animated
+- select: 'call[name="Animated.timing"]'
+  tag: animation
+  attrs:
+    type: transition
+    duration: $1.duration
+    easing: $1.easing
+
+# Flutter AnimationController
+- select: 'variable[type="AnimationController"]'
+  tag: animation
+  attrs:
+    type: transition
+    duration: $initializer.duration
+```
+
 ### Extractors
 
 For frameworks where routes/controllers are registered imperatively at runtime (Express, Koa, Django), static analysis cannot discover them. Extractors are user-provided scripts that execute in the target language runtime and output annotations in a standard JSON format.
@@ -3449,6 +3816,13 @@ The [walkthrough](./WALKTHROUGH.md) <sup>[[2]](#references)</sup> demonstrates t
   - Contract versioning: how to handle API version evolution in integration annotations?
   - Saga compensation: how to ensure all saga steps have compensation actions annotated?
   - Service discovery: should integration annotations reference service registry entries?
+- **UI framework modeling**
+  - State flow: how to trace data flow from global state through to UI components?
+  - Platform-specific code: how to annotate code that only runs on iOS vs Android?
+  - View hierarchy: should parent-child view relationships be explicit in annotations?
+  - Animation sequences: how to model complex multi-step animations?
+  - Accessibility coverage: can annotations help ensure accessibility compliance?
+  - Native bridge safety: how to annotate which native calls are safe on which platforms?
 - **Annotation versioning**
   - When the schema manifest changes (tags added, removed, renamed), how are existing annotation files migrated?
 - **Performance characteristics**
