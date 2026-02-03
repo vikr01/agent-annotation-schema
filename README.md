@@ -154,6 +154,8 @@ aql.repair()
 | Annotation store | `.aql` sidecar reading, schema manifest validation | Implemented ([aql-engine](https://github.com/vikr01/aql)) |
 | MCP server | Exposes query language as 5 MCP tools | Implemented ([aql-mcp-server](https://github.com/vikr01/aql)) |
 | Web REPL | Browser-based playground for queries | Implemented ([aql-repl](https://github.com/vikr01/aql)) |
+| Schema presets | Community-contributed tag presets (`@aql/preset-*`) | Specified |
+| Extractors | Runtime route extraction for Express, Django, etc. | Planned |
 | Mutations | Transactional read/write for annotation files | Planned |
 
 ---
